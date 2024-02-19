@@ -31,6 +31,8 @@ import javax.swing.SwingWorker;
 import javax.swing.Timer;
 import javax.swing.table.DefaultTableModel;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.text.ParseException;
 import java.util.HashMap;
@@ -61,28 +63,28 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
     private String SQL_INSERT;
     private String SQL_INSERT_2;
     private List data;
-    
+
     public static InternalCreateVoucher getInstance() {
         if (internalCreateVoucher == null) {
             internalCreateVoucher = new InternalCreateVoucher();
         }
-        
+
         return internalCreateVoucher;
     }
-    
-    private PurchaseController purchaseController;
-    private VoucherController voucherController;
-    private TableHeader tableHeader;
+
+    private final PurchaseController purchaseController;
+    private final VoucherController voucherController;
+    private final TableHeader tableHeader;
     private int idProvider;
-    
+
     public void setIdProvider(int idProvider) {
         this.idProvider = idProvider;
     }
-    
+
     public void setProviderName(String providerName) {
         companyField.setText(providerName);
     }
-    
+
     public InternalCreateVoucher() {
         initComponents();
         purchaseController = new PurchaseController();
@@ -94,18 +96,18 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
         userName.setText("" + ManagementSessions.getFullName());
         changeCurrency();
         setTitleVoucher();
-        
+
         FillCombo.authorizationSignatures(signaturesGroupCB);
-        
+
     }
-    
+
     private void setCurrencyComission() {
         try {
             if (radioQuetzales.isSelected()) {
                 commisionField.setFormatterFactory(new DefaultFormatterFactory(new MaskFormatter("Q#,###,###,###,###.##")));
-                
+
             }
-            
+
             if (radioDollars.isSelected()) {
                 commisionField.setFormatterFactory(new DefaultFormatterFactory(new MaskFormatter("$#,###,###,###,###.##")));
             }
@@ -113,11 +115,8 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
             Logger.getLogger(InternalCreateVoucher.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
-    
+
     private void listPurchasesAvailable() {
-        
-        ArrayList<String> criterios = null;
-        
         if (radioQuetzales.isSelected()) {
             sql = new StringBuilder("SELECT id, "
                     + "purchaseNumber, "
@@ -144,9 +143,9 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
                     + ") AS subquery "
                     + "WHERE acceptance_date IS NOT NULL "
                     + "AND voucher_exist = 'NO'");
-            
+
         }
-        
+
         if (radioDollars.isSelected()) {
             sql = new StringBuilder("SELECT id, "
                     + "purchaseNumber, "
@@ -173,13 +172,12 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
                     + ") AS subquery "
                     + "WHERE acceptance_date IS NOT NULL "
                     + "AND voucher_exist = 'NO'");
-            
+
         }
-        
-        System.out.println(sql.toString());
+
         data = purchaseController.listPurchase(sql.toString());
     }
-    
+
     private void refreshDataTableInBackground() {
         JDialog loadingDialog = createLoadingDialog((JFrame) SwingUtilities.windowForComponent(FrameMain.mainDesk));
         Timer timer = new Timer(2000, (ActionEvent e) -> {
@@ -187,37 +185,37 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
         });
         timer.setRepeats(false);
         timer.start();
-        
+
         SwingWorker<Void, Void> worker = new SwingWorker<Void, Void>() {
             @Override
             protected Void doInBackground() throws Exception {
                 listPurchasesAvailable();
                 return null;
             }
-            
+
             @Override
             protected void done() {
-                
+
                 List list = data;
                 DefaultTableModel model = (DefaultTableModel) tablePurchasesAvalaible.getModel();
                 model.getDataVector().clear();
                 for (int i = 1; i < list.size(); i++) {
                     Object[] row = (Object[]) list.get(i);
                     model.addRow(row);
-                    
+
                 }
                 model.fireTableDataChanged();
-                
+
                 timer.stop();
                 loadingDialog.dispose();
             }
         };
-        
+
         worker.execute();
     }
-    
+
     private static JDialog createLoadingDialog(JFrame parent) {
-        
+
         JDialog loadingDialog = new Loading(parent, false);
         loadingDialog.setDefaultCloseOperation(JDialog.DO_NOTHING_ON_CLOSE); // Evitar que el usuario cierre la notificación
         loadingDialog.setSize(90, 90);
@@ -226,7 +224,7 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
         loadingDialog.setVisible(true);
         return loadingDialog;
     }
-    
+
     private void changeCurrency() {
         if (radioDollars.isSelected()) {
             voucherTableDescription.setDefaultRenderer(Object.class, new CustomRender());
@@ -235,7 +233,7 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
             tablePurchasesAvalaible.repaint();
             comissionLabel.setText("Comission $:");
         }
-        
+
         if (radioQuetzales.isSelected()) {
             voucherTableDescription.setDefaultRenderer(Object.class, new CustomRender());
             voucherTableDescription.repaint();
@@ -772,7 +770,7 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
     }                                      
 
     private void jButton1ActionPerformed(java.awt.event.ActionEvent evt) {                                         
-        
+
         if (voucherTableDescription.getRowCount() == 0) {
             SearchProviders providers = new SearchProviders(
                     (Frame) SwingUtilities.windowForComponent(InternalCreateVoucher.getInstance()), true, this);
@@ -789,12 +787,12 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
                 providers.setVisible(true);
             }
         }
-        
+
 
     }                                        
 
     private void jButton3ActionPerformed(java.awt.event.ActionEvent evt) {                                         
-        
+
         if (voucherTableDescription.getRowCount() == 0) {
             if (idProvider != 0) {
                 refreshDataTableInBackground();
@@ -818,40 +816,40 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
     private void jButton4ActionPerformed(java.awt.event.ActionEvent evt) {                                         
         DefaultTableModel modeloOrigen = (DefaultTableModel) tablePurchasesAvalaible.getModel();
         DefaultTableModel modeloDestino = (DefaultTableModel) voucherTableDescription.getModel();
-        
+
         int filaSeleccionada = tablePurchasesAvalaible.getSelectedRow();
-        
+
         if (filaSeleccionada != -1) {
             Object[] fila = new Object[modeloOrigen.getColumnCount()];
             for (int i = 0; i < modeloOrigen.getColumnCount(); i++) {
                 fila[i] = modeloOrigen.getValueAt(filaSeleccionada, i);
             }
-            
-            modeloDestino.addRow(fila); 
-            modeloOrigen.removeRow(filaSeleccionada); 
+
+            modeloDestino.addRow(fila);
+            modeloOrigen.removeRow(filaSeleccionada);
             calculateAmount();
         } else {
             JOptionPane.showMessageDialog(null, "Select a row to move to the voucher", "Error", JOptionPane.ERROR_MESSAGE);
         }
-        
+
 
     }                                        
 
     private void jButton5ActionPerformed(java.awt.event.ActionEvent evt) {                                         
-        
+
         DefaultTableModel modeloOrigen = (DefaultTableModel) voucherTableDescription.getModel();
         DefaultTableModel modeloDestino = (DefaultTableModel) tablePurchasesAvalaible.getModel();
-        
+
         int filaSeleccionada = voucherTableDescription.getSelectedRow();
-        
+
         if (filaSeleccionada != -1) {
             ArrayList<Object> fila = new ArrayList<>();
             for (int i = 0; i < modeloOrigen.getColumnCount(); i++) {
                 fila.add(modeloOrigen.getValueAt(filaSeleccionada, i));
             }
-            
+
             modeloDestino.addRow(fila.toArray());
-            
+
             modeloOrigen.removeRow(filaSeleccionada);
             calculateAmount();
         } else {
@@ -871,7 +869,7 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
                     amountField.setText("");
                     commisionField.setText("");
                     gTotalField.setText("");
-                    
+
                 } else {
                     isHandlingEvent = true;
                     radioDollars.setSelected(true);
@@ -893,7 +891,7 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
                     commisionField.setText("");
                     gTotalField.setText("");
                 } else {
-                    
+
                     isHandlingEvent = true;
                     radioQuetzales.setSelected(true);
                     isHandlingEvent = false;
@@ -906,46 +904,46 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
     private void radioQuetzalesActionPerformed(java.awt.event.ActionEvent evt) {                                               
         // TODO add your handling code here:
     }                                              
-    
+
     private boolean generateVoucher() {
-        
+
         if (radioDollars.isSelected()) {
             SQL_INSERT = "INSERT INTO voucher_dollars (voucher_number,id_user_created,created_date, status, payment_date,voucher_header, remarks, type_payment,type_voucher, comission, signature_group ) "
                     + "(SELECT coalesce(MAX(voucher_number),0)+1, ?, NOW(), ?, ?, ?, ?, ?,?,?,? FROM voucher_dollars FOR UPDATE)";
             SQL_INSERT_2 = "INSERT INTO purchases_vouchers_dollars_vinculation (id_purchase, id_voucher, invoices, invoice_date) VALUES(?,?,?,?)";
         }
-        
+
         if (radioQuetzales.isSelected()) {
-            
+
             SQL_INSERT = "INSERT INTO voucher_quetzales (voucher_number,id_user_created,created_date, status, payment_date,voucher_header, remarks, type_payment, type_voucher, comission, signature_group) "
                     + "(SELECT coalesce(MAX(voucher_number),0)+1, ?, NOW(), ?, ?, ?, ?, ?,?,?, ? FROM voucher_quetzales FOR UPDATE)";
-                SQL_INSERT_2 = "INSERT INTO purchases_vouchers_quetzales_vinculation (id_purchase, id_voucher, invoices, invoice_date) VALUES(?,?,?,?)";
-            
+            SQL_INSERT_2 = "INSERT INTO purchases_vouchers_quetzales_vinculation (id_purchase, id_voucher, invoices, invoice_date) VALUES(?,?,?,?)";
+
         }
-        
+
         Map.Entry<String, Integer> selectedItem = (Map.Entry<String, Integer>) signaturesGroupCB.getSelectedItem();
         String paymentMethod = null;
         String tyoeVoucher = null;
         if (cash.isSelected()) {
             paymentMethod = "Cash";
         }
-        
+
         if (creditCard.isSelected()) {
             paymentMethod = "Credit Card";
         }
-        
+
         if (cashierCheck.isSelected()) {
             paymentMethod = "Cashier Check";
         }
-        
+
         if (simpleVoucherRBtn.isSelected()) {
             tyoeVoucher = "SIMPLE";
         }
-        
+
         if (detailedVoucherRBtn.isSelected()) {
             tyoeVoucher = "DETAILED";
         }
-        
+
         ArrayList<Voucher> listVoucher = new ArrayList<>();
         for (int i = 0; i < voucherTableDescription.getRowCount(); i++) {
             Voucher voucher = new Voucher();
@@ -957,16 +955,16 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
             Object value = voucherTableDescription.getValueAt(i, 4);
             voucher.setRemarks(remarks.getText());
             Date value2 = (Date) voucherTableDescription.getValueAt(i, 5);
-            
+
             if (value instanceof String && value != null) {
                 voucher.setInvoices(value.toString());
             }
-            
+
             if (value2 != null && value2 instanceof Date) {
                 voucher.setInvoiceDate((Date) value2);
             }
             voucher.setTypeVoucher(tyoeVoucher);
-            
+
             if (!commisionField.getText().trim().isEmpty()) {
                 String valueCommisionField = commisionField.getText().trim();
                 valueCommisionField = valueCommisionField.replace(",", "");
@@ -974,49 +972,106 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
             } else {
                 voucher.setComission(0);
             }
-            
+
             voucher.setSignatureGroup(selectedItem.getValue());
             listVoucher.add(voucher);
         }
-        
+
         return voucherController.insertVoucher(listVoucher, SQL_INSERT, SQL_INSERT_2);
     }
-    
+
     private void openReportBackground() {
         SwingWorker<Void, Void> openReport = new SwingWorker<Void, Void>() {
             @Override
             protected Void doInBackground() throws Exception {
-                
+
                 if (radioDollars.isSelected()) {
                     openReporDollars(voucherController.getLastInsertId());
                 }
-                
+
                 if (radioQuetzales.isSelected()) {
                     openReporQuetzales(voucherController.getLastInsertId());
                 }
                 return null;
             }
-            
+
         };
         openReport.execute();
     }
-    
-    public void openReporDollars(int id) throws SQLException {
-        try (Connection cn = ConnectToDataBase.getInstance().getConnection()) {
+
+    public void openReporDollars(int id) {
+
+        String name1 = null;
+        String name2 = null;
+        String name3 = null;
+        String name4 = null;
+        String consultaSQL = "SELECT ps.name "
+                + "FROM vinculate_people_signatures_group vpsg "
+                + "JOIN people_signatures ps ON vpsg.idPeople_signature = ps.id "
+                + "WHERE vpsg.idGroup_signature = (SELECT signature_group FROM voucher_dollars WHERE id = ?)";
+
+        try (Connection cn = ConnectToDataBase.getInstance().getConnection(); PreparedStatement pstm = cn.prepareStatement(consultaSQL)) {
+            pstm.setInt(1, id);
+            try (ResultSet rs = pstm.executeQuery()) {
+                int contador = 1;
+                while (rs.next() && contador <= 4) {
+                    String nombre = rs.getString("ps.name");
+                    switch (contador) {
+                        case 1:
+                            name1 = nombre;
+                            break;
+                        case 2:
+                            name2 = nombre;
+                            break;
+                        case 3:
+                            name3 = nombre;
+                            break;
+                        case 4:
+                            name4 = nombre;
+                            break;
+                        default:
+                            break;
+                    }
+
+                    contador++;
+
+                }
+
+                if (name4 == null && name3 == null && name1 != null && name2 != null) {
+                    name4 = name2;
+                    name3 = name1;
+                    name2 = null;
+                    name1 = null;
+                }
+
+                if (name4 == null && name3 != null && name2 != null && name3 != null) {
+                    name4 = name3;
+                    name3 = name2;
+                    name2 = name1;
+                    name1 = null;
+                }
+
+            } catch (Exception e) {
+                Messages.information(e.getMessage());
+            }
+
             JasperReport jasper;
-            JasperReport jasper2;
-            
+
             InputStream inputStream = getClass().getResourceAsStream("/reports/voucher_dollars_main.jasper");
             jasper = (JasperReport) JRLoader.loadObject(inputStream);
-            
+
             InputStream inputStream2 = getClass().getResourceAsStream("/reports/voucher_dollars_sub.jasper");
-            
+
             Map<String, Object> parameters = new HashMap<>();
             parameters.put("searchId", id);
             parameters.put("subreportStream", inputStream2);
-            
+            parameters.put("name1", name1);
+            parameters.put("name2", name2);
+            parameters.put("name3", name3);
+            parameters.put("name4", name4);
+
             JasperPrint print = JasperFillManager.fillReport(jasper, parameters, cn);
-            
+
             reportViewer viewer = new reportViewer(print);
             Report report = new Report();
             report.setPreferredSize(new Dimension(1280, 720));
@@ -1026,26 +1081,84 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
             report.setVisible(true);
         } catch (JRException | SQLException ex) {
             Messages.error(ex.getMessage());
-            ex.printStackTrace();
         }
     }
-    
+
+    /**
+     *
+     * @param id
+     */
     public void openReporQuetzales(int id) {
-        try (Connection cn = ConnectToDataBase.getInstance().getConnection()) {
+
+        String name1 = null;
+        String name2 = null;
+        String name3 = null;
+        String name4 = null;
+        String consultaSQL = "SELECT ps.name "
+                + "FROM vinculate_people_signatures_group vpsg "
+                + "JOIN people_signatures ps ON vpsg.idPeople_signature = ps.id "
+                + "WHERE vpsg.idGroup_signature = (SELECT signature_group FROM voucher_quetzales WHERE id = ?)";
+
+        try (Connection cn = ConnectToDataBase.getInstance().getConnection(); PreparedStatement pstm = cn.prepareStatement(consultaSQL)) {
+            pstm.setInt(1, id);
+            try (ResultSet rs = pstm.executeQuery()) {
+                int contador = 1;
+                while (rs.next() && contador <= 4) {
+                    String nombre = rs.getString("ps.name");
+                    switch (contador) {
+                        case 1:
+                            name1 = nombre;
+                            break;
+                        case 2:
+                            name2 = nombre;
+                            break;
+                        case 3:
+                            name3 = nombre;
+                            break;
+                        case 4:
+                            name4 = nombre;
+                            break;
+                        default:
+                            break;
+                    }
+
+                    contador++;
+
+                }
+
+                if (name4 == null && name3 == null && name1 != null && name2 != null) {
+                    name4 = name2;
+                    name3 = name1;
+                    name2 = null;
+                    name1 = null;
+                }
+
+                if (name4 == null && name3 != null && name2 != null && name3 != null) {
+                    name4 = name3;
+                    name3 = name2;
+                    name2 = name1;
+                    name1 = null;
+                }
+
+            } catch (Exception e) {
+                Messages.information(e.getMessage());
+            }
+
             JasperReport jasper;
-            JasperReport jasper2;
-            
             InputStream inputStream = getClass().getResourceAsStream("/reports/voucher_quetzales_main.jasper");
             jasper = (JasperReport) JRLoader.loadObject(inputStream);
-            
+
             InputStream inputStream2 = getClass().getResourceAsStream("/reports/voucher_quetzales_sub.jasper");
-            
             Map<String, Object> parameters = new HashMap<>();
             parameters.put("searchId", id);
             parameters.put("subreportStream", inputStream2);
-            
+            parameters.put("name1", name1);
+            parameters.put("name2", name2);
+            parameters.put("name3", name3);
+            parameters.put("name4", name4);
+
             JasperPrint print = JasperFillManager.fillReport(jasper, parameters, cn);
-            
+
             reportViewer viewer = new reportViewer(print);
             Report report = new Report();
             report.setPreferredSize(new Dimension(1280, 720));
@@ -1055,10 +1168,9 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
             report.setVisible(true);
         } catch (JRException | SQLException ex) {
             Messages.error(ex.getMessage());
-            ex.printStackTrace();
         }
     }
-    
+
 
     private void jButton2ActionPerformed(java.awt.event.ActionEvent evt) {                                         
         if (validateFields()) {
@@ -1070,7 +1182,7 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
             Messages.information("You must have at least one purchase on the voucher");
         }
     }                                        
-    
+
     private void cleanFields() {
         remarks.setText("");
         idProvider = 0;
@@ -1105,7 +1217,7 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
         if (!Character.isDigit(e) && e != '.') {
             evt.consume();
         }
-        
+
         if (e == '.' && commisionField.getText().contains(".")) {
             evt.consume();
         }
@@ -1118,17 +1230,17 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
     private void commisionFieldKeyReleased(java.awt.event.KeyEvent evt) {                                           
         calculateAmount();
     }                                          
-    
+
     private void setTitleVoucher() {
         if (jRadioButton4.isSelected()) {
             titleVoucherField.setText("KNIT CREATIVE INTERNATIONAL, S.A");
         }
-        
+
         if (jRadioButton5.isSelected()) {
             titleVoucherField.setText("APPAREL KCI, S.A");
         }
     }
-    
+
     private boolean validateFields() {
         if (ValidateField.isEmpty(titleVoucherField) && ValidateField.isEmpty(amountField)
                 && voucherTableDescription.getRowCount() > 0) {
@@ -1136,51 +1248,51 @@ public class InternalCreateVoucher extends javax.swing.JInternalFrame {
         }
         return false;
     }
-    
+
     private void calculateAmount() {
         double amount = 0.00;
         double gTotal = 0.00;
         double comission = 0.00;
-        
+
         if (voucherTableDescription.getRowCount() > 0) {
             for (int i = 0; i < voucherTableDescription.getRowCount(); i++) {
                 amount += ((BigDecimal) voucherTableDescription.getValueAt(i, 3)).doubleValue();
-                
+
             }
-            
+
             if (!commisionField.getText().isEmpty()) {
                 comission = Double.parseDouble(commisionField.getText());
             }
-            
+
             if (radioDollars.isSelected()) {
                 Currency currency = Currency.getInstance("USD");
                 DecimalFormat currencyFormat = (DecimalFormat) DecimalFormat.getCurrencyInstance();
                 currencyFormat.setCurrency(currency);
-                
+
                 String formattedValue = currencyFormat.format(amount);
-                
+
                 amountField.setText(formattedValue);
                 formattedValue = currencyFormat.format((amount + comission));
                 gTotalField.setText(formattedValue);
-                
+
             }
-            
+
             if (radioQuetzales.isSelected()) {
                 Currency currency = Currency.getInstance("GTQ");
                 DecimalFormat currencyFormat = (DecimalFormat) DecimalFormat.getCurrencyInstance();
                 currencyFormat.setCurrency(currency);
-                
+
                 String formattedSuccessFulValue = currencyFormat.format(amount);
                 amountField.setText(formattedSuccessFulValue);
                 formattedSuccessFulValue = currencyFormat.format((amount + comission));
                 gTotalField.setText(formattedSuccessFulValue);
-                
+
             }
         } else {
             amountField.setText("");
             commisionField.setText("");
         }
-        
+
     }
 
     // Variables declaration - do not modify                     
